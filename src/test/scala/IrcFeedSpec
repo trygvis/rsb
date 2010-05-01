@@ -1,0 +1,175 @@
+class IrcFeedSpec extends Specification {
+    "githubRepositoryListToList" should {
+        "parse" in {
+            val document = 
+            <repositories type="array">
+              <repository>
+                <description>Event Management Suite</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">5</forks>
+                <watchers type="integer">13</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage>http://smia.java.no</homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/ems</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>ems</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>JavaZone's agenda planner</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">4</forks>
+                <watchers type="integer">18</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage></homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/incogito</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>incogito</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>Web app for submitting presentation proposals</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">3</forks>
+                <watchers type="integer">7</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage></homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/submitit</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>submitit</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>JavaZone's agenda planner for 2008</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">0</forks>
+                <watchers type="integer">1</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage>http://javazone.no/incogito</homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/incogito-2008</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>incogito-2008</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>Contains code necessary participate in the Scala training course.</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">6</forks>
+                <watchers type="integer">22</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage></homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/scala-training-code</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>scala-training-code</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>Contains slides for the Scala training course.</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">5</forks>
+                <watchers type="integer">27</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage></homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/scala-training-slides</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>scala-training-slides</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>Web site</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">2</forks>
+                <watchers type="integer">6</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage>http://www.javazone.no</homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/javazone2010</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>javazone2010</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>Front application of java.no</description>
+                <has-issues type="boolean">false</has-issues>
+                <forks type="integer">1</forks>
+                <watchers type="integer">4</watchers>
+                <has-downloads type="boolean">false</has-downloads>
+                <homepage>http://wiki.java.no/display/smia/Cibus</homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/cibus</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">false</has-wiki>
+                <name>cibus</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>Incogito client and conference app for Android.</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">0</forks>
+                <watchers type="integer">4</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage></homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/androidito</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>androidito</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description>iPhone application for Incogito</description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">0</forks>
+                <watchers type="integer">2</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage></homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/iphonito</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>iphonito</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+              <repository>
+                <description></description>
+                <has-issues type="boolean">true</has-issues>
+                <forks type="integer">0</forks>
+                <watchers type="integer">6</watchers>
+                <has-downloads type="boolean">true</has-downloads>
+                <homepage>http://wiki.java.no/display/smia/Cibus</homepage>
+                <fork type="boolean">false</fork>
+                <url>http://github.com/javaBin/cibus2</url>
+                <private type="boolean">false</private>
+                <has-wiki type="boolean">true</has-wiki>
+                <name>cibus2</name>
+                <owner>javaBin</owner>
+                <open-issues type="integer">0</open-issues>
+              </repository>
+            </repositories>
+        }
+    }
+}
+
