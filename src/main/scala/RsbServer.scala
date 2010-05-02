@@ -14,7 +14,7 @@ class RsbHandler extends AbstractHandler {
         }
 
         println(" IN: " + httpRequest.getMethod + " " + httpRequest.getRequestURI);
-        val request = new RsbRequest(httpRequest.getRequestURI)
+        val request = new RsbRequest(httpRequest.getRequestURI, QueryParameters(httpRequest.getQueryString))
         val result = resource.apply(request)
         println(" IN: " + result.status)
         httpResponse.setStatus(result.status)

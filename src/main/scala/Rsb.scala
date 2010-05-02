@@ -1,6 +1,9 @@
 import java.io._
 import java.net._
 import scala.xml.NodeSeq
+import org.codehaus.httpcache4j._
+import org.codehaus.httpcache4j.cache._
+import org.codehaus.httpcache4j.urlconnection._
 
 sealed case class ResourceResponse(status: Int, headers: HttpHeaders, stream: InputStream)
 
@@ -21,8 +24,38 @@ object HttpHeaders {
     def apply() = new HttpHeaders(Map())
 }
 
-class RsbRequest(val path: String) {
+case class QueryParameters(private val values: Map[String, List[String]]) {
+    def headers = values.keySet
+
+    def header(header: String): Option[List[String]] = values.get(header)
+}
+
+object QueryParameters {
+    def apply(value: String) = new QueryParameters(Map())
+}
+
+class RsbRequest(val path: String, queryParameters: QueryParameters) {
     def subRequest(url: URL, verb: String): ResourceResponse = {
+        import scala.collection.jcl.{Conversions, MutableIterator}
+    
+        println("OUT: " + verb + " " + url)
+
+        val method = verb match {
+            case "GET" => HTTPMethod.GET
+            case _ => error("Unsupported verb '" + verb + "'")
+        }
+        val request = new HTTPRequest(url.toURI, method)
+        val response = RsbRequest.cache.doCachedRequest(request)
+
+        val h = response.getHeaders
+        val headers: HttpHeaders = new HttpHeaders(new MutableIterator.Wrapper(h.keySet.iterator).foldLeft(Map[String, List[String]]())((map, key) => (map + ((key, Conversions.convertList(h.getHeaders(key)).map(_.getValue).toList)))))
+
+        println("OUT: " + response.getStatus.getCode + " " + response.getStatus.getName)
+
+        new ResourceResponse(response.getStatus.getCode, headers, response.getPayload.getInputStream)
+    }
+
+    private def doJavaNetUrlRequest(url: URL, verb: String): ResourceResponse = {
         import scala.collection.jcl.{Map => JMap, Conversions}
         // TODO: Caching of the request
         // TODO: Caching of the transformed value
@@ -41,6 +74,13 @@ class RsbRequest(val path: String) {
                 new ResourceResponse(code, headers, connection.getInputStream)
         }
     }
+}
+
+object RsbRequest {
+    private val cacheStoreDirectory = new File(System.getProperty("user.home"), ".rsb/cache")
+    if(!cacheStoreDirectory.isDirectory && !cacheStoreDirectory.mkdirs()) error("Could not create directory: " + cacheStoreDirectory)
+
+    val cache = new HTTPCache(new PersistentCacheStorage(cacheStoreDirectory), new URLConnectionResponseResolver(new URLConnectionConfigurator))
 }
 
 abstract class RsbResource {

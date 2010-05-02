@@ -1,5 +1,6 @@
-import org.specs._
 import java.net._
+import org.joda.time._
+import org.specs._
 
 import IrcFeed._
 
@@ -37,9 +38,10 @@ class IrcFeedSpec extends Specification {
               </entry>
           </feed>
           
-          val e1 = AtomEntry("Refactored aggregated sessions display (lightning talks) and made the splashcreen logo original size", "blah")
-          val e2 = AtomEntry("Lightning talks now aggregated to one session, and sort order for the different views", "meh")
-          nodeSeqToAtomDocument(document) must be equalTo AtomDocument(List(e1, e2))
+          val updated = AtomDocument.formatter.parseDateTime("2010-04-27T14:12:51-07:00")
+          val e1 = AtomEntry("Refactored aggregated sessions display (lightning talks) and made the splashcreen logo original size", AtomAuthor("Øyvind Løkling"), "blah")
+          val e2 = AtomEntry("Lightning talks now aggregated to one session, and sort order for the different views", AtomAuthor("Øyvind Løkling"), "meh")
+          nodeSeqToAtomDocument(document) must be equalTo AtomDocument("tag:github.com,2008:/javaBin/androidito/commits/master", "Recent Commits to androidito:master", updated, List(e1, e2))
         }
     }
 
