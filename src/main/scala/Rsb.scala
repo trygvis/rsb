@@ -7,9 +7,37 @@ import org.codehaus.httpcache4j.urlconnection._
 
 case class RR(status: Int, headers: HttpHeaders)
 
-sealed class ResourceResponse[A, B] private(_status: Int, _headers: HttpHeaders, value: A)(f: PartialFunction[RR, A => B]) {
-//    def map[C](g: (B) => C) = new ResourceResponse[A, C](status, headers, value)(f.andThen(g))
+sealed class ResourceResponse[A] private(_status: Int, _headers: HttpHeaders, producer: => A) {
+    private var v: Any = null
 
+    def map(f: PartialFunction[RR, A => ResourceResponse[InputStream]]): ResourceResponse[InputStream] = {
+        try {
+            f(new RR(_status, _headers))(producer)
+        }
+        catch {
+            case e: MatchError => Rsb.internalError("No match")
+            case e => throw e
+        }
+    }
+
+    def map[B](f: PartialFunction[RR, A => B]): Either[ResourceResponse[InputStream], B] = new ResourceResponse[B](_status, _headers, {
+        try {
+            Right(f(new RR(_status, _headers))(producer))
+        }
+        catch {
+            case e: MatchError => Left(Rsb.internalError("No match"))
+            case e => throw e
+        }
+    })
+
+    def value: A = {
+        if(v == null) {
+            v = producer
+        }
+        v
+    }
+
+    /*
     def value: Either[ResourceResponse[InputStream, InputStream], B] = {
         val rr = RR(_status, _headers)
 
@@ -18,6 +46,7 @@ sealed class ResourceResponse[A, B] private(_status: Int, _headers: HttpHeaders,
             case false => Left(Rsb.internalError("poop"))
         }
     }
+    */
 
     def status = _status
 
@@ -25,9 +54,7 @@ sealed class ResourceResponse[A, B] private(_status: Int, _headers: HttpHeaders,
 }
 
 object ResourceResponse {
-    def apply(status: Int, headers: HttpHeaders, value: InputStream) = new ResourceResponse(status, headers, value)({
-        case x => (identity[InputStream])
-    })
+    def apply(status: Int, headers: HttpHeaders, value: InputStream) = new ResourceResponse(status, headers, value)
 }
 
 case class ContentType(val value: String)
@@ -57,9 +84,8 @@ object QueryParameters {
     def apply(value: String) = new QueryParameters(Map())
 }
 
-// (f: PartialFunction[ResourceResponse, T])
 class RsbRequest(val path: String, queryParameters: QueryParameters) {
-    def subRequest(url: URL, verb: String): ResourceResponse[InputStream, InputStream] = {
+    def subRequest[A](url: URL, verb: String): ResourceResponse[InputStream] = {
         import scala.collection.jcl.{Conversions, MutableIterator}
     
         println("OUT: " + verb + " " + url)
@@ -108,11 +134,11 @@ object RsbRequest {
 }
 
 abstract class RsbResource {
-    def apply(request: RsbRequest): ResourceResponse[InputStream, InputStream]
+    def apply(request: RsbRequest): ResourceResponse[InputStream]
 }
 
 object Rsb {
-    def stringResponse(status: Int, message: String): ResourceResponse[InputStream, InputStream] = stringResponse(status, HttpHeaders(), message)
+    def stringResponse(status: Int, message: String): ResourceResponse[InputStream] = stringResponse(status, HttpHeaders(), message)
 
     def stringResponse(status: Int, headers: HttpHeaders, message: String) = ResourceResponse(status, 
         HttpHeaders().withContentType("text/plain").withContentEncoding("UTF-8"), 
@@ -122,7 +148,7 @@ object Rsb {
 
     def notFound(message: String) = stringResponse(400, message)
 
-    def notFound: ResourceResponse[InputStream, InputStream] = notFound("Resource not found")
+    def notFound: ResourceResponse[InputStream] = notFound("Resource not found")
 
     implicit def contentType(value: String): ContentType = ContentType(value)
 

@@ -30,20 +30,18 @@ class IrcFeedRsbResource extends RsbResource {
     val Project = """/projects/([a-z]*)""".r
     val PassThroughProject = """/direct-([a-z]*)""".r
 
-    def requestRepositoryList(request: RsbRequest): Either[ResourceResponse[InputStream, InputStream], SortedMap[String, URL]] = {
+    def requestRepositoryList(request: RsbRequest): Either[ResourceResponse[InputStream], SortedMap[String, URL]] = {
         val f = inputStreamToNodeSeq.andThen(githubRepositoryListToList).andThen(list => TreeMap[String, URL]() ++ list)
-        request.subRequest(javabinRepositories, "GET") match {
-            case ResourceResponse(200, headers, is) => Right(f(is))
-            case x => Left(x)
-        }
+        request.subRequest(javabinRepositories, "GET").map({
+            case RR(200, headers) => f
+        })
     }
 
     def requestRepository(request: RsbRequest, url: URL): Either[ResourceResponse[InputStream], List[AtomEntry]] = {
         val f = inputStreamToNodeSeq.andThen(nodeSeqToAtomDocument).andThen(_.entries)
-        request.subRequest(url, "GET") match {
-            case ResourceResponse(200, headers, is) => Right(f(is))
-            case x => Left(x)
-        }
+        request.subRequest(url, "GET").map( {
+            case RR(200, headers) => f
+        })
     }
 
     def apply(request: RsbRequest) = {
@@ -72,10 +70,9 @@ class IrcFeedRsbResource extends RsbResource {
                         case None => notFound("No such project '" + project + "'")
                         case Some(_) =>
                             val f: Function1[InputStream, InputStream] = inputStreamToNodeSeq.andThen(nodeSeqToAtomDocument.andThen(AtomDocument.toNodeSeq).andThen(curried(nodeSeqToInputStream)("UTF-8")))
-                            request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET") match {
-                                case ResourceResponse(200, headers, is) => ResourceResponse(200, headers, f(is))
-                                case x => x
-                            }
+                            request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET").map({
+                                case RR(200, headers) => f
+                            })
                     }
                     case Left(x) => x
                 }
