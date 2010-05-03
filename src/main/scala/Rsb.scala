@@ -5,7 +5,30 @@ import org.codehaus.httpcache4j._
 import org.codehaus.httpcache4j.cache._
 import org.codehaus.httpcache4j.urlconnection._
 
-sealed case class ResourceResponse(status: Int, headers: HttpHeaders, stream: InputStream)
+case class RR(status: Int, headers: HttpHeaders)
+
+sealed class ResourceResponse[A, B] private(_status: Int, _headers: HttpHeaders, value: A)(f: PartialFunction[RR, A => B]) {
+//    def map[C](g: (B) => C) = new ResourceResponse[A, C](status, headers, value)(f.andThen(g))
+
+    def value: Either[ResourceResponse[InputStream, InputStream], B] = {
+        val rr = RR(_status, _headers)
+
+        f.isDefinedAt(rr) match {
+            case true => Right(f(rr)(value))
+            case false => Left(Rsb.internalError("poop"))
+        }
+    }
+
+    def status = _status
+
+    def headers = _headers
+}
+
+object ResourceResponse {
+    def apply(status: Int, headers: HttpHeaders, value: InputStream) = new ResourceResponse(status, headers, value)({
+        case x => (identity[InputStream])
+    })
+}
 
 case class ContentType(val value: String)
 
@@ -34,8 +57,9 @@ object QueryParameters {
     def apply(value: String) = new QueryParameters(Map())
 }
 
+// (f: PartialFunction[ResourceResponse, T])
 class RsbRequest(val path: String, queryParameters: QueryParameters) {
-    def subRequest(url: URL, verb: String): ResourceResponse = {
+    def subRequest(url: URL, verb: String): ResourceResponse[InputStream, InputStream] = {
         import scala.collection.jcl.{Conversions, MutableIterator}
     
         println("OUT: " + verb + " " + url)
@@ -48,14 +72,14 @@ class RsbRequest(val path: String, queryParameters: QueryParameters) {
         val response = RsbRequest.cache.doCachedRequest(request)
 
         val h = response.getHeaders
-        val headers: HttpHeaders = new HttpHeaders(new MutableIterator.Wrapper(h.keySet.iterator).foldLeft(Map[String, List[String]]())((map, key) => (map + ((key, Conversions.convertList(h.getHeaders(key)).map(_.getValue).toList)))))
+        val headers = new MutableIterator.Wrapper(h.keySet.iterator).foldLeft(Map[String, List[String]]())((map, key) => (map + ((key, Conversions.convertList(h.getHeaders(key)).map(_.getValue).toList))))
 
         println("OUT: " + response.getStatus.getCode + " " + response.getStatus.getName)
 
-        new ResourceResponse(response.getStatus.getCode, headers, response.getPayload.getInputStream)
+        ResourceResponse(response.getStatus.getCode, HttpHeaders(headers), response.getPayload.getInputStream)
     }
 
-    private def doJavaNetUrlRequest(url: URL, verb: String): ResourceResponse = {
+    private def doJavaNetUrlRequest(url: URL, verb: String): ResourceResponse[InputStream, InputStream] = {
         import scala.collection.jcl.{Map => JMap, Conversions}
         // TODO: Caching of the request
         // TODO: Caching of the transformed value
@@ -69,9 +93,9 @@ class RsbRequest(val path: String, queryParameters: QueryParameters) {
 
         connection.getResponseCode match {
             case 404 => 
-                new ResourceResponse(404, headers, connection.getErrorStream)
+                ResourceResponse(404, headers, connection.getErrorStream)
             case code => 
-                new ResourceResponse(code, headers, connection.getInputStream)
+                ResourceResponse(code, headers, connection.getInputStream)
         }
     }
 }
@@ -84,21 +108,21 @@ object RsbRequest {
 }
 
 abstract class RsbResource {
-    def apply(request: RsbRequest): ResourceResponse
+    def apply(request: RsbRequest): ResourceResponse[InputStream, InputStream]
 }
 
 object Rsb {
-    def stringResponse(status: Int, message: String): ResourceResponse = stringResponse(status, HttpHeaders(), message)
+    def stringResponse(status: Int, message: String): ResourceResponse[InputStream, InputStream] = stringResponse(status, HttpHeaders(), message)
 
-    def stringResponse(status: Int, headers: HttpHeaders, message: String) = new ResourceResponse(status, 
+    def stringResponse(status: Int, headers: HttpHeaders, message: String) = ResourceResponse(status, 
         HttpHeaders().withContentType("text/plain").withContentEncoding("UTF-8"), 
-        new ByteArrayInputStream((message + "\n").getBytes("UTF-8")))
+        new ByteArrayInputStream((message + "\n").getBytes("UTF-8")).asInstanceOf[InputStream])
 
     def internalError(message: String) = stringResponse(500, message)
 
     def notFound(message: String) = stringResponse(400, message)
 
-    def notFound: ResourceResponse = notFound("Resource not found")
+    def notFound: ResourceResponse[InputStream, InputStream] = notFound("Resource not found")
 
     implicit def contentType(value: String): ContentType = ContentType(value)
 
