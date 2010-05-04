@@ -6,13 +6,28 @@ import org.codehaus.httpcache4j._
 import org.codehaus.httpcache4j.cache._
 import org.codehaus.httpcache4j.urlconnection._
 
-sealed class RR(val status: Int, val headers: HttpHeaders, val stream: InputStream)
-
-class ObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream, val value: A) extends RR(_status, _headers, _stream) {
-    def makeCacheable(serializer: A => InputStream) = new CacheableObjectRR[A](_status, _headers, _stream, value, serializer)
+sealed abstract class RR(val status: Int, val headers: HttpHeaders) {
 }
 
-class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream, val value: A, val serializer: A => InputStream) extends RR(_status, _headers, _stream) {
+object RR {
+    def apply(status: Int, headers: HttpHeaders, stream: InputStream) = new StreamRR(status, headers, stream)
+
+    def apply[A](status: Int, headers: HttpHeaders, value: A) = new ObjectRR(status, headers, value)
+
+    def unapply(rr: RR): Option[(Int, HttpHeaders)] = Some((rr.status, rr.headers))
+}
+
+class StreamRR(private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream) extends RR(_status, _headers) {
+    def stream = _stream
+}
+
+class ObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val value: A) extends RR(_status, _headers) {
+    def makeCacheable(serializer: A => InputStream) = new CacheableObjectRR[A](_status, _headers, value, serializer)
+}
+
+class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, val value: A, val serializer: A => InputStream) extends RR(_status, _headers) {
+
+    def stream: InputStream = serializer(value)
 
     /*
     var v: Option[(RR, A)] = None
@@ -30,14 +45,6 @@ class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpH
 
     def headers = _headers
     */
-}
-
-object RR {
-    def apply(status: Int, headers: HttpHeaders, stream: InputStream) = new RR(status, headers, stream)
-
-    def apply[A](status: Int, headers: HttpHeaders, stream: InputStream, value: A) = new ObjectRR(status, headers, stream, value)
-
-    def unapply(rr: RR) = Some((rr.status, rr.headers))
 }
 
 case class ContentType(val value: String)
@@ -68,7 +75,7 @@ object QueryParameters {
 }
 
 class RsbRequest(val path: String, queryParameters: QueryParameters) {
-    def subRequest[A](url: URL, verb: String)(f: RR => RR): RR = {
+    def subRequest[A](url: URL, verb: String)(f: StreamRR => StreamRR): StreamRR = {
         import scala.collection.jcl.{Conversions, MutableIterator}
     
         println("OUT: " + verb + " " + url)
@@ -119,16 +126,17 @@ object RsbRequest {
 }
 
 abstract class RsbResource {
-    def apply(request: RsbRequest): RR
+    def apply(request: RsbRequest): StreamRR
 }
 
 object Rsb {
 //    def stringResponse(message: String): (RR, InputStream) => InputStream = { (rr: RR, InputStream) => stringResponse(rr.status, message)}
 
     // TODO: Make Cacheable
-    def stringResponse(status: Int, message: String): RR =
-        new ObjectRR(status, HttpHeaders().withContentType("text/plain").withContentEncoding("UTF-8"),
-        new ByteArrayInputStream((message + "\n").getBytes("UTF-8")).asInstanceOf[InputStream], identity[InputStream])
+    def stringResponse(status: Int, message: String): StreamRR =
+        new StreamRR(status, HttpHeaders().withContentType("text/plain").withContentEncoding("UTF-8"), stringSerializer(message))
+
+    val stringSerializer: String => InputStream = {message => new ByteArrayInputStream((message + "\n").getBytes("UTF-8")).asInstanceOf[InputStream]}
 
     def internalError(message: String) = stringResponse(500, message)
 
@@ -144,9 +152,9 @@ object Rsb {
 
     def identity[T]: Function[T, T] = {t: T => t}
 
-    def withDefaults[A](serializer: A => InputStream)(f: PartialFunction[RR, A]): RR => RR = { (rr: RR) =>
+    def withDefaults[A](serializer: A => InputStream)(f: PartialFunction[RR, InputStream => A]): RR => RR = { (rr: RR) =>
         if(f.isDefinedAt(rr)) {
-            new CacheableObjectRR(rr.status, rr.headers, rr.stream, f(rr), serializer)
+            new CacheableObjectRR(rr.status, rr.headers, f(rr), serializer)
         } else {
             Rsb.internalError("Bad request")
         }

@@ -20,6 +20,8 @@ object AtomDocument {
     val toNodeSeq = {(atomDocument: AtomDocument) => atomDocument.toNodeSeq}
 
     val formatter = ISODateTimeFormat.dateTimeParser
+
+    val serializer = toNodeSeq andThen Rsb.nodeSeqToInputStream("UTF-8")
 }
 
 case class AtomAuthor(name: String) {
@@ -37,4 +39,3 @@ case class AtomEntry(title: String, author: AtomAuthor, content: String) {
             <content>{content}</content>
         </entry>
 }
-

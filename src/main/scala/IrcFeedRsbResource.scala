@@ -32,10 +32,11 @@ class IrcFeedRsbResource extends RsbResource {
 
     val streamToAtom = inputStreamToNodeSeq andThen nodeSeqToAtomDocument
 
+    /*
     def requestRepositoryList(request: RsbRequest): ObjectRR[SortedMap[String,  URL]] = {
         val f: (InputStream => SortedMap[String,  URL]) = inputStreamToNodeSeq.andThen(githubRepositoryListToList).andThen(list => TreeMap[String, URL]() ++ list)
-        request.subRequest(javabinRepositories, "GET")(withDefaults(AtomDocument.toNodeSeq.andThen(nodeSeqToInputStream("UTF-8"))) {
-            case (rr@RR(200, _), is) => (rr, f(is))
+        request.subRequest(javabinRepositories, "GET")(withDefaults(AtomDocument.serializer) {
+            case RR(200, is) => f
         })
     }
 
@@ -45,9 +46,11 @@ class IrcFeedRsbResource extends RsbResource {
             case (rr@RR(200, headers), is) => (rr, f(is))
         })
     }
+    */
 
     def apply(request: RsbRequest) = {
         request.path match {
+            /*
             case Projects() =>
                 requestRepositoryList(request) match {
                     case Right(repositories) =>
@@ -62,9 +65,11 @@ class IrcFeedRsbResource extends RsbResource {
                         ResourceResponse(200, HttpHeaders().withContentType("application/atom+xml; charset=utf-8"), nodeSeqToInputStream("UTF-8", document.toNodeSeq))
                     case _ => internalError("Unable to get list of repositories")
                 }
+            */
             case PassThroughProject(project) =>
                 // This will simply stream the data from the backend directly
-                request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET")
+                request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET") { identity[StreamRR] }
+            /*
             case Project(project) =>
                 // Download the repositories url, find the correct project, download the atom for the project, parse it as atom, and pass it back out as atom
                 requestRepositoryList(request) match {
@@ -78,6 +83,7 @@ class IrcFeedRsbResource extends RsbResource {
                     }
                     case Left(x) => x
                 }
+            */
             case resource =>
                 internalError("Invalid resource: " + resource)
         }

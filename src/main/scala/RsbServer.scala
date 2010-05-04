@@ -20,7 +20,7 @@ class RsbHandler extends AbstractHandler {
         httpResponse.setStatus(result.status)
         result.headers.foreach(t => t._2.foreach(value => httpResponse.setHeader(t._1, value)))
 
-        IO.copy(result.value, httpResponse.getOutputStream())
+        IO.copy(result.stream, httpResponse.getOutputStream())
         baseRequest.setHandled(true)
     }
 }
