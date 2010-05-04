@@ -30,17 +30,19 @@ class IrcFeedRsbResource extends RsbResource {
     val Project = """/projects/([a-z]*)""".r
     val PassThroughProject = """/direct-([a-z]*)""".r
 
-    def requestRepositoryList(request: RsbRequest): Either[ResourceResponse[InputStream], SortedMap[String, URL]] = {
-        val f = inputStreamToNodeSeq.andThen(githubRepositoryListToList).andThen(list => TreeMap[String, URL]() ++ list)
-        request.subRequest(javabinRepositories, "GET").map({
-            case RR(200, headers) => f
+    val streamToAtom = inputStreamToNodeSeq andThen nodeSeqToAtomDocument
+
+    def requestRepositoryList(request: RsbRequest): ObjectRR[SortedMap[String,  URL]] = {
+        val f: (InputStream => SortedMap[String,  URL]) = inputStreamToNodeSeq.andThen(githubRepositoryListToList).andThen(list => TreeMap[String, URL]() ++ list)
+        request.subRequest(javabinRepositories, "GET")(withDefaults(AtomDocument.toNodeSeq.andThen(nodeSeqToInputStream("UTF-8"))) {
+            case (rr@RR(200, _), is) => (rr, f(is))
         })
     }
 
     def requestRepository(request: RsbRequest, url: URL): Either[ResourceResponse[InputStream], List[AtomEntry]] = {
         val f = inputStreamToNodeSeq.andThen(nodeSeqToAtomDocument).andThen(_.entries)
-        request.subRequest(url, "GET").map( {
-            case RR(200, headers) => f
+        request.subRequest(url, "GET")( withDefaults(AtomDocument.toNodeSeq andThen nodeSeqToInputStream("UTF-8")) {
+            case (rr@RR(200, headers), is) => (rr, f(is))
         })
     }
 

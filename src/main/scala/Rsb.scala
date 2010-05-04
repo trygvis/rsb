@@ -1,60 +1,43 @@
 import java.io._
 import java.net._
 import scala.xml.NodeSeq
+import Function._
 import org.codehaus.httpcache4j._
 import org.codehaus.httpcache4j.cache._
 import org.codehaus.httpcache4j.urlconnection._
 
-case class RR(status: Int, headers: HttpHeaders)
+sealed class RR(val status: Int, val headers: HttpHeaders, val stream: InputStream)
 
-sealed class ResourceResponse[A] private(_status: Int, _headers: HttpHeaders, producer: => A) {
-    private var v: Any = null
+class ObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream, val value: A) extends RR(_status, _headers, _stream) {
+    def makeCacheable(serializer: A => InputStream) = new CacheableObjectRR[A](_status, _headers, _stream, value, serializer)
+}
 
-    def map(f: PartialFunction[RR, A => ResourceResponse[InputStream]]): ResourceResponse[InputStream] = {
-        try {
-            f(new RR(_status, _headers))(producer)
-        }
-        catch {
-            case e: MatchError => Rsb.internalError("No match")
-            case e => throw e
-        }
-    }
-
-    def map[B](f: PartialFunction[RR, A => B]): Either[ResourceResponse[InputStream], B] = new ResourceResponse[B](_status, _headers, {
-        try {
-            Right(f(new RR(_status, _headers))(producer))
-        }
-        catch {
-            case e: MatchError => Left(Rsb.internalError("No match"))
-            case e => throw e
-        }
-    })
-
-    def value: A = {
-        if(v == null) {
-            v = producer
-        }
-        v
-    }
+class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream, val value: A, val serializer: A => InputStream) extends RR(_status, _headers, _stream) {
 
     /*
-    def value: Either[ResourceResponse[InputStream, InputStream], B] = {
-        val rr = RR(_status, _headers)
-
-        f.isDefinedAt(rr) match {
-            case true => Right(f(rr)(value))
-            case false => Left(Rsb.internalError("poop"))
+    var v: Option[(RR, A)] = None
+    def value: (RR, A) =
+        v match {
+            case Some(value) => value
+            case None => {
+                val value = f(new RR(_status, _headers), _value)
+                v = Some(value)
+                value
+            }
         }
-    }
-    */
 
     def status = _status
 
     def headers = _headers
+    */
 }
 
-object ResourceResponse {
-    def apply(status: Int, headers: HttpHeaders, value: InputStream) = new ResourceResponse(status, headers, value)
+object RR {
+    def apply(status: Int, headers: HttpHeaders, stream: InputStream) = new RR(status, headers, stream)
+
+    def apply[A](status: Int, headers: HttpHeaders, stream: InputStream, value: A) = new ObjectRR(status, headers, stream, value)
+
+    def unapply(rr: RR) = Some((rr.status, rr.headers))
 }
 
 case class ContentType(val value: String)
@@ -62,7 +45,7 @@ case class ContentType(val value: String)
 object ContentType {
 }
 
-case class HttpHeaders(val values: Map[String, List[String]]) extends Iterable[(String, List[String])] {
+case class HttpHeaders(private val values: Map[String, List[String]]) extends Iterable[(String, List[String])] {
     def elements = values.elements
 
     def withContentType(contentType: ContentType) = new HttpHeaders(values + (("Content-Type",  List(contentType.value))))
@@ -85,7 +68,7 @@ object QueryParameters {
 }
 
 class RsbRequest(val path: String, queryParameters: QueryParameters) {
-    def subRequest[A](url: URL, verb: String): ResourceResponse[InputStream] = {
+    def subRequest[A](url: URL, verb: String)(f: RR => RR): RR = {
         import scala.collection.jcl.{Conversions, MutableIterator}
     
         println("OUT: " + verb + " " + url)
@@ -102,9 +85,10 @@ class RsbRequest(val path: String, queryParameters: QueryParameters) {
 
         println("OUT: " + response.getStatus.getCode + " " + response.getStatus.getName)
 
-        ResourceResponse(response.getStatus.getCode, HttpHeaders(headers), response.getPayload.getInputStream)
+        RR(response.getStatus.getCode, HttpHeaders(headers), response.getPayload.getInputStream)
     }
 
+    /*
     private def doJavaNetUrlRequest(url: URL, verb: String): ResourceResponse[InputStream, InputStream] = {
         import scala.collection.jcl.{Map => JMap, Conversions}
         // TODO: Caching of the request
@@ -124,6 +108,7 @@ class RsbRequest(val path: String, queryParameters: QueryParameters) {
                 ResourceResponse(code, headers, connection.getInputStream)
         }
     }
+    */
 }
 
 object RsbRequest {
@@ -134,28 +119,36 @@ object RsbRequest {
 }
 
 abstract class RsbResource {
-    def apply(request: RsbRequest): ResourceResponse[InputStream]
+    def apply(request: RsbRequest): RR
 }
 
 object Rsb {
-    def stringResponse(status: Int, message: String): ResourceResponse[InputStream] = stringResponse(status, HttpHeaders(), message)
+//    def stringResponse(message: String): (RR, InputStream) => InputStream = { (rr: RR, InputStream) => stringResponse(rr.status, message)}
 
-    def stringResponse(status: Int, headers: HttpHeaders, message: String) = ResourceResponse(status, 
-        HttpHeaders().withContentType("text/plain").withContentEncoding("UTF-8"), 
-        new ByteArrayInputStream((message + "\n").getBytes("UTF-8")).asInstanceOf[InputStream])
+    // TODO: Make Cacheable
+    def stringResponse(status: Int, message: String): RR =
+        new ObjectRR(status, HttpHeaders().withContentType("text/plain").withContentEncoding("UTF-8"),
+        new ByteArrayInputStream((message + "\n").getBytes("UTF-8")).asInstanceOf[InputStream], identity[InputStream])
 
     def internalError(message: String) = stringResponse(500, message)
 
     def notFound(message: String) = stringResponse(400, message)
 
-    def notFound: ResourceResponse[InputStream] = notFound("Resource not found")
+    def notFound: RR = notFound("Resource not found")
 
     implicit def contentType(value: String): ContentType = ContentType(value)
 
     val inputStreamToNodeSeq: Function1[InputStream, NodeSeq] = {is => scala.xml.XML.load(is)}
 
-    val nodeSeqToInputStream = {(encoding: String, nodes: NodeSeq) => new ByteArrayInputStream(nodes.toString.getBytes(encoding))}
+    val nodeSeqToInputStream = curried({(encoding: String, nodes: NodeSeq) => new ByteArrayInputStream(nodes.toString.getBytes(encoding))})
 
     def identity[T]: Function[T, T] = {t: T => t}
-}
 
+    def withDefaults[A](serializer: A => InputStream)(f: PartialFunction[RR, A]): RR => RR = { (rr: RR) =>
+        if(f.isDefinedAt(rr)) {
+            new CacheableObjectRR(rr.status, rr.headers, rr.stream, f(rr), serializer)
+        } else {
+            Rsb.internalError("Bad request")
+        }
+    }
+}
