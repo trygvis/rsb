@@ -17,36 +17,28 @@ object RR {
     def unapply(rr: RR): Option[(Int)] = Some((rr.status))
 }
 
-class StreamRR(private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream) extends RR(_status, _headers) {
-    def stream = _stream
-}
-
 class ObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val _value: A) extends RR(_status, _headers) {
     def value = _value
 
     def makeCacheable(serializer: A => InputStream) = new CacheableObjectRR[A](_status, _headers, value, serializer)
 }
 
-class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, val value: A, val serializer: (A) => InputStream) extends RR(_status, _headers) {
+abstract class StreamableRR(private val _status: Int, private val _headers: HttpHeaders) extends RR(_status, _headers) {
+    def stream: InputStream
+}
 
+object StreamableRR {
+//    def unapply(rr: StreamableRR): Option[(Int, InputStream)] = Some((rr.status, rr.stream))
+
+    def unapply(rr: StreamableRR): Option[(Int, HttpHeaders, InputStream)] = Some((rr.status, rr.headers, rr.stream))
+}
+
+class StreamRR(private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream) extends StreamableRR(_status, _headers) {
+    def stream = _stream
+}
+
+class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, val value: A, val serializer: (A) => InputStream) extends StreamableRR(_status, _headers) {
     def stream: InputStream = serializer(value)
-
-    /*
-    var v: Option[(RR, A)] = None
-    def value: (RR, A) =
-        v match {
-            case Some(value) => value
-            case None => {
-                val value = f(new RR(_status, _headers), _value)
-                v = Some(value)
-                value
-            }
-        }
-
-    def status = _status
-
-    def headers = _headers
-    */
 }
 
 case class ContentType(val value: String)
@@ -76,9 +68,13 @@ object QueryParameters {
     def apply(value: String) = new QueryParameters(Map())
 }
 
+abstract class RsbResource {
+    def apply(request: RsbRequest): StreamableRR
+}
+
 class RsbRequest(val path: String, queryParameters: QueryParameters) {
 
-    def subRequest[A](url: URL, verb: String)(f: StreamRR => StreamRR): StreamRR = {
+    def subRequest[A <: StreamableRR, B <: StreamableRR](url: URL, verb: String)(f: A => B): B = {
         import scala.collection.jcl.{Conversions, MutableIterator}
     
         println("OUT: " + verb + " " + url)
@@ -95,7 +91,7 @@ class RsbRequest(val path: String, queryParameters: QueryParameters) {
 
         println("OUT: " + response.getStatus.getCode + " " + response.getStatus.getName)
 
-        RR(response.getStatus.getCode, HttpHeaders(headers), response.getPayload.getInputStream)
+        f(new StreamRR(response.getStatus.getCode, HttpHeaders(headers), response.getPayload.getInputStream).asInstanceOf[A])
     }
 
     /*
@@ -128,24 +124,17 @@ object RsbRequest {
     val cache = new HTTPCache(new PersistentCacheStorage(cacheStoreDirectory), new URLConnectionResponseResolver(new URLConnectionConfigurator))
 }
 
-abstract class RsbResource {
-    def apply(request: RsbRequest): StreamRR
-}
-
 object Rsb {
-//    def stringResponse(message: String): (RR, InputStream) => InputStream = { (rr: RR, InputStream) => stringResponse(rr.status, message)}
-
-    // TODO: Make Cacheable
-    def stringResponse(status: Int, message: String): StreamRR =
-        new StreamRR(status, HttpHeaders().withContentType("text/plain").withContentEncoding("UTF-8"), stringSerializer(message))
-
     val stringSerializer: String => InputStream = {message => new ByteArrayInputStream((message + "\n").getBytes("UTF-8")).asInstanceOf[InputStream]}
+
+    def stringResponse(status: Int, message: String): CacheableObjectRR[String] =
+        new CacheableObjectRR[String](status, HttpHeaders().withContentType("text/plain").withContentEncoding("UTF-8"), message, stringSerializer)
 
     def internalError(message: String) = stringResponse(500, message)
 
     def notFound(message: String) = stringResponse(404, message)
 
-    def notFound: RR = notFound("Resource not found")
+    def notFound: CacheableObjectRR[String] = notFound("Resource not found")
 
     implicit def contentType(value: String): ContentType = ContentType(value)
 
@@ -155,7 +144,7 @@ object Rsb {
 
     def identity[T]: Function[T, T] = {t: T => t}
 
-    def withDefaults[A](serializer: A => InputStream)(f: PartialFunction[StreamRR, InputStream => A]): StreamRR => RR = { (rr: StreamRR) =>
+    def withDefaults[A](serializer: A => InputStream)(f: PartialFunction[RR, InputStream => A]): StreamableRR => StreamableRR = { (rr: StreamableRR) =>
         if(f.isDefinedAt(rr)) {
             new CacheableObjectRR[A](rr.status, rr.headers, f(rr)(rr.stream), serializer)
         } else {

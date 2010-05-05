@@ -15,11 +15,10 @@ class RsbHandler extends AbstractHandler {
 
         println(" IN: " + httpRequest.getMethod + " " + httpRequest.getRequestURI);
         val request = new RsbRequest(httpRequest.getRequestURI, QueryParameters(httpRequest.getQueryString))
-        val result = resource.apply(request)
+        val result: StreamableRR = resource.apply(request)
         println(" IN: " + result.status)
         httpResponse.setStatus(result.status)
         result.headers.foreach(t => t._2.foreach(value => httpResponse.setHeader(t._1, value)))
-
         IO.copy(result.stream, httpResponse.getOutputStream())
         baseRequest.setHandled(true)
     }

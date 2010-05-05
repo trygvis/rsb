@@ -29,7 +29,7 @@ class IrcFeedRsbResource extends RsbResource {
     val Projects = """/projects""".r
     val Project = """/projects/([a-z]*)""".r
     val SimpleProject = """/simple-projects/([a-z]*)""".r
-    val PassThroughProject = """/direct-([a-z]*)""".r
+    val DirectProject = """/direct-([a-z]*)""".r
 
     val streamToAtom = inputStreamToNodeSeq andThen nodeSeqToAtomDocument
 
@@ -67,15 +67,21 @@ class IrcFeedRsbResource extends RsbResource {
                     case _ => internalError("Unable to get list of repositories")
                 }
             */
-            case PassThroughProject(project) =>
+            case DirectProject(project) =>
                 // Stream the data from the backend directly
-                request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET"){ identity[StreamRR] }
+                request.subRequest[StreamableRR, StreamableRR](new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET"){ identity[StreamableRR] }
             case SimpleProject(project) =>
-                val f: Function1[InputStream, InputStream] = inputStreamToNodeSeq.andThen(nodeSeqToAtomDocument.andThen(AtomDocument.toNodeSeq).andThen(nodeSeqToInputStream("UTF-8")))
                 // Parse the data and send it back out
-                request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET")(withDefaults(null) {
+                // val f: Function1[InputStream, InputStream] = inputStreamToNodeSeq.andThen(nodeSeqToAtomDocument.andThen(AtomDocument.toNodeSeq).andThen(nodeSeqToInputStream("UTF-8")))
+                val f: Function1[InputStream, AtomDocument] = inputStreamToNodeSeq andThen nodeSeqToAtomDocument
+                val x: StreamableRR => StreamableRR = withDefaults[AtomDocument](AtomDocument.serializer) {
                     case RR(200) => f
-                })
+                }
+                //request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET")(x)
+                request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET") {
+                    case StreamableRR(200, headers, is) => new CacheableObjectRR(200, headers, f(is), AtomDocument.serializer)
+                    case _ => internalError("Bad response from backend")
+                }
             /*
             case Project(project) =>
                 // Download the repositories url, find the correct project, download the atom for the project, parse it as atom, and pass it back out as atom
