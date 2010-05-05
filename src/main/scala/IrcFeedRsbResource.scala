@@ -28,6 +28,7 @@ class IrcFeedRsbResource extends RsbResource {
 
     val Projects = """/projects""".r
     val Project = """/projects/([a-z]*)""".r
+    val SimpleProject = """/simple-projects/([a-z]*)""".r
     val PassThroughProject = """/direct-([a-z]*)""".r
 
     val streamToAtom = inputStreamToNodeSeq andThen nodeSeqToAtomDocument
@@ -67,8 +68,14 @@ class IrcFeedRsbResource extends RsbResource {
                 }
             */
             case PassThroughProject(project) =>
-                // This will simply stream the data from the backend directly
-                request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET") { identity[StreamRR] }
+                // Stream the data from the backend directly
+                request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET"){ identity[StreamRR] }
+            case SimpleProject(project) =>
+                val f: Function1[InputStream, InputStream] = inputStreamToNodeSeq.andThen(nodeSeqToAtomDocument.andThen(AtomDocument.toNodeSeq).andThen(nodeSeqToInputStream("UTF-8")))
+                // Parse the data and send it back out
+                request.subRequest(new URL("http://github.com/javaBin/" + project + "/commits/master.atom"), "GET")(withDefaults(null) {
+                    case RR(200) => f
+                })
             /*
             case Project(project) =>
                 // Download the repositories url, find the correct project, download the atom for the project, parse it as atom, and pass it back out as atom
@@ -85,7 +92,7 @@ class IrcFeedRsbResource extends RsbResource {
                 }
             */
             case resource =>
-                internalError("Invalid resource: " + resource)
+                notFound("Invalid resource: " + resource)
         }
     }
 }

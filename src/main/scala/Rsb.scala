@@ -14,18 +14,20 @@ object RR {
 
     def apply[A](status: Int, headers: HttpHeaders, value: A) = new ObjectRR(status, headers, value)
 
-    def unapply(rr: RR): Option[(Int, HttpHeaders)] = Some((rr.status, rr.headers))
+    def unapply(rr: RR): Option[(Int)] = Some((rr.status))
 }
 
 class StreamRR(private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream) extends RR(_status, _headers) {
     def stream = _stream
 }
 
-class ObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val value: A) extends RR(_status, _headers) {
+class ObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val _value: A) extends RR(_status, _headers) {
+    def value = _value
+
     def makeCacheable(serializer: A => InputStream) = new CacheableObjectRR[A](_status, _headers, value, serializer)
 }
 
-class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, val value: A, val serializer: A => InputStream) extends RR(_status, _headers) {
+class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, val value: A, val serializer: (A) => InputStream) extends RR(_status, _headers) {
 
     def stream: InputStream = serializer(value)
 
@@ -75,6 +77,7 @@ object QueryParameters {
 }
 
 class RsbRequest(val path: String, queryParameters: QueryParameters) {
+
     def subRequest[A](url: URL, verb: String)(f: StreamRR => StreamRR): StreamRR = {
         import scala.collection.jcl.{Conversions, MutableIterator}
     
@@ -140,7 +143,7 @@ object Rsb {
 
     def internalError(message: String) = stringResponse(500, message)
 
-    def notFound(message: String) = stringResponse(400, message)
+    def notFound(message: String) = stringResponse(404, message)
 
     def notFound: RR = notFound("Resource not found")
 
@@ -152,9 +155,9 @@ object Rsb {
 
     def identity[T]: Function[T, T] = {t: T => t}
 
-    def withDefaults[A](serializer: A => InputStream)(f: PartialFunction[RR, InputStream => A]): RR => RR = { (rr: RR) =>
+    def withDefaults[A](serializer: A => InputStream)(f: PartialFunction[StreamRR, InputStream => A]): StreamRR => RR = { (rr: StreamRR) =>
         if(f.isDefinedAt(rr)) {
-            new CacheableObjectRR(rr.status, rr.headers, f(rr), serializer)
+            new CacheableObjectRR[A](rr.status, rr.headers, f(rr)(rr.stream), serializer)
         } else {
             Rsb.internalError("Bad request")
         }
