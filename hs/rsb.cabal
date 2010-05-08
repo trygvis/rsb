@@ -1,0 +1,14 @@
+Name:                   rsb
+Version:                0.0.1
+Author:                 Trygve Laugstøl <trygvis@inamo.no>
+Maintainer:             Trygve Laugstøl <trygvis@inamo.no>
+License:                BSD3
+Synopsis:               RESTful middleware
+Description:            A library for building efficient REST services
+Category:               Network
+Cabal-Version:          >= 1.6
+Build-Type:             Simple
+
+Executable rsb
+  Main-Is:              rsb.hs
+  Build-Depends:        base >= 4 && < 5, parsec, webserver, c10k, bytestring, filepath, time
