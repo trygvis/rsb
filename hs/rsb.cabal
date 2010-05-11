@@ -9,6 +9,7 @@ Category:               Network
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
 
-Executable rsb
-  Main-Is:              rsb.hs
-  Build-Depends:        base >= 4 && < 5, parsec, webserver, c10k, bytestring, filepath, time
+Executable GitHubRsb
+  Main-Is:              GitHubRsb.hs
+  Build-Depends:        base >= 4 && < 5, parsec, webserver, c10k, bytestring, filepath, time, datetime, regex-posix, HTTP
+  extensions:           ScopedTypeVariables
