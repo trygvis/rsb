@@ -2,5 +2,4 @@ dist
 *-*.*
 *.swp
 *.hi
-*.hs
 *.o
