@@ -17,20 +17,25 @@ data Request = Request {
 }
 
 data Response = Response {
-      status :: (Int, Int, Int) -- TODO: Create a type
-    , responseLength :: Maybe Int
-    , body :: IO L.ByteString
+      responseStatus :: (Int, Int, Int) -- TODO: Create a type
+    , responseContentLength :: Maybe Int
+    , responseBody :: Maybe (IO L.ByteString)
 }
 
 subRequest :: URI -> Request -> (Response -> a) -> Response
 subRequest uri originalRequest f = error (show uri)
 
+defaultResponse = Response {
+          responseStatus = (5,0,0)
+        , responseBody = Just (return (L.pack "internal error"))
+        , responseContentLength = Nothing
+    }
+
 notFound :: Response
 notFound = 
-    Response {
-          status = (4,0,4)
-        , body = return b
-        , responseLength = Nothing
+    defaultResponse {
+          responseStatus = (4,0,4)
+        , responseBody = Just (return b)
     }
     where
         b = L.pack ("not found")

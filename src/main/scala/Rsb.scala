@@ -6,38 +6,36 @@ import org.codehaus.httpcache4j._
 import org.codehaus.httpcache4j.cache._
 import org.codehaus.httpcache4j.urlconnection._
 
-sealed abstract class RR(val status: Int, val headers: HttpHeaders) {
+sealed abstract class RR(val status: Int, val headers: HttpHeaders, var subRequests: List[RR]) {
 }
 
 object RR {
-    def apply(status: Int, headers: HttpHeaders, stream: InputStream) = new StreamRR(status, headers, stream)
+//    def apply(status: Int, headers: HttpHeaders, stream: InputStream) = new StreamRR(status, headers, stream)
 
-    def apply[A](status: Int, headers: HttpHeaders, value: A) = new ObjectRR(status, headers, value)
+//    def apply[A](status: Int, headers: HttpHeaders, value: A) = new ObjectRR(status, headers, value)
 
     def unapply(rr: RR): Option[(Int)] = Some((rr.status))
 }
 
-class ObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, private val _value: A) extends RR(_status, _headers) {
+class ObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, var _subRequests: List[RR], private val _value: A) extends RR(_status, _headers, _subRequests) {
     def value = _value
 
-    def makeCacheable(serializer: A => InputStream) = new CacheableObjectRR[A](_status, _headers, value, serializer)
+    def makeCacheable(serializer: A => InputStream) = new CacheableObjectRR[A](status, headers, subRequests, value, serializer)
 }
 
-abstract class StreamableRR(private val _status: Int, private val _headers: HttpHeaders) extends RR(_status, _headers) {
+abstract class StreamableRR(private val _status: Int, private val _headers: HttpHeaders, var _subRequests: List[RR]) extends RR(_status, _headers, _subRequests) {
     def stream: InputStream
 }
 
 object StreamableRR {
-//    def unapply(rr: StreamableRR): Option[(Int, InputStream)] = Some((rr.status, rr.stream))
-
     def unapply(rr: StreamableRR): Option[(Int, HttpHeaders, InputStream)] = Some((rr.status, rr.headers, rr.stream))
 }
 
-class StreamRR(private val _status: Int, private val _headers: HttpHeaders, private val _stream: InputStream) extends StreamableRR(_status, _headers) {
+class StreamRR(private val _status: Int, private val _headers: HttpHeaders, var _subRequests: List[RR], private val _stream: InputStream) extends StreamableRR(_status, _headers, _subRequests) {
     def stream = _stream
 }
 
-class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, val value: A, val serializer: (A) => InputStream) extends StreamableRR(_status, _headers) {
+class CacheableObjectRR[A](private val _status: Int, private val _headers: HttpHeaders, var _subRequests: List[RR], val value: A, val serializer: (A) => InputStream) extends StreamableRR(_status, _headers, _subRequests) {
     def stream: InputStream = serializer(value)
 }
 
@@ -151,4 +149,13 @@ object Rsb {
             Rsb.internalError("Bad request")
         }
     }
+    /*
+    def toObject[A](f: PartialFunction[RR, InputStream => A]): StreamableRR => Either[StreamRR, ObjectRR[A]] = { (rr: StreamableRR) =>
+        if(f.isDefinedAt(rr)) {
+            Right(new ObjectRR[A](rr.status, rr.headers, f(rr)(rr.stream)))
+        } else {
+            Left(Rsb.internalError("Bad request"))
+        }
+    }
+    */
 }

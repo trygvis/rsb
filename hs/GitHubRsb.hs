@@ -17,7 +17,7 @@ findLength rsp =
 
 fetch :: String -> IO String
 fetch url = do
-    putStrLn ("OUT: " ++ url)
+    putStrLn ("OUT: " ++ (trace ("fetch: " ++ url) url))
     result <- simpleHTTP (getRequest url)
     case result of
         Left _ ->
@@ -34,9 +34,9 @@ fetch url = do
 
 directProject :: String -> Rsb.Response
 directProject project =
-    Rsb.Response {
-                  status = (2,0,0)
-                , body = b
+    defaultResponse {
+                  responseStatus = (2,0,0)
+                , responseBody = b
             }
     where
         b = do

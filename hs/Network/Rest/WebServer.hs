@@ -8,6 +8,8 @@ import qualified Network.Web.HTTP as HTTP(Request, Response)
 import Network.Web.Server
 import Network.Web.Server.Params
 import Network.Rest.Rsb
+import qualified Network.Rest.Rsb as Rsb
+import Data.Maybe
 
 simpleServer :: Application -> WebServer
 simpleServer cnf mreq = case mreq of
@@ -23,16 +25,23 @@ responseNotImplement = makeResponse NotImplemented []
 
 processGET :: Application -> HTTP.Request -> IO HTTP.Response
 processGET app req = do
-    return (makeResponse2 OK body len (createHeaders response))
+    let
+        appRequest = Rsb.Request {
+            uri = reqURI req
+        }
+        appResponse = (action app) appRequest
+        headers = createHeaders appResponse
+        body = fmap (\io -> ) (responseBody appResponse)
+    return (makeResponse2 OK body len headers)
     where
-        response = action app
-        body = Nothing
         len = Nothing
+
+foo123 :: Lazy.ByteString -> IO HTTP.Response
+foo123 = error("woot")
 
 createHeaders :: Response -> [(FieldKey, FieldValue)]
 createHeaders response =
-        filter (\m -> case m of 
-                Just x -> True 
-                _ -> False) maybeHeaders
+        catMaybes [server, contentLength]
     where
-        maybeHeaders = [ Just (FkServer, pack "RSB"), fmap (\len -> (FkContentLength, pack (show len)) (responseLength response)) ]
+        server = Just (FkServer, pack "RSB")
+        contentLength = fmap (\len -> (FkContentLength, pack (show len))) (responseContentLength response)
