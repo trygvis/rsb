@@ -36,7 +36,7 @@ directProject :: String -> Rsb.Response
 directProject project =
     defaultResponse {
                   responseStatus = (2,0,0)
-                , responseBody = b
+                , responseBody = Just b
             }
     where
         b = do

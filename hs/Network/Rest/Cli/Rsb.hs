@@ -1,4 +1,4 @@
-module Rsb(
+module Network.Rest.Cli.Rsb(
           runApp
         , subRequest
         , rsbReturn

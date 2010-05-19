@@ -9,7 +9,25 @@ Category:               Network
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
 
+Library
+  Build-Depends:        base >= 4 && < 5, parsec, webserver, c10k, bytestring, filepath, time, datetime, regex-posix, HTTP
+  Exposed-Modules:      Network.Rest.Cli.Rsb,
+                        Network.Rest.Rsb,
+                        Network.Rest.WebServer,
+                        Network.Rest.C10k
+
 Executable GitHubRsb
   Main-Is:              GitHubRsb.hs
-  Build-Depends:        base >= 4 && < 5, parsec, webserver, c10k, bytestring, filepath, time, datetime, regex-posix, HTTP
-  extensions:           ScopedTypeVariables
+  Extensions:           ScopedTypeVariables
+  Other-Modules:        Network.Rest.Rsb,
+                        Network.Rest.WebServer,
+                        Network.Rest.C10k
+
+Executable MyApp1
+  Main-Is:              MyApp1.hs
+  Other-Modules:        Network.Rest.Cli.Rsb
+
+Executable MyApp2
+  Main-Is:              MyApp2.hs
+  Build-Depends:        HaXml
+  Other-Modules:        Network.Rest.Cli.Rsb

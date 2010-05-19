@@ -1,6 +1,7 @@
 module Network.Rest.WebServer(simpleServer) where
 
 import Data.ByteString.Char8(pack)
+import qualified Data.ByteString.Lazy.Char8 as L
 import Control.Applicative
 import Control.Monad
 import Network.Web.HTTP hiding(Request, Response)
@@ -31,13 +32,11 @@ processGET app req = do
         }
         appResponse = (action app) appRequest
         headers = createHeaders appResponse
-        body = fmap (\io -> ) (responseBody appResponse)
+--        body = fmap (\io -> ) (responseBody appResponse)
+        body = return (L.pack "")
     return (makeResponse2 OK body len headers)
     where
         len = Nothing
-
-foo123 :: Lazy.ByteString -> IO HTTP.Response
-foo123 = error("woot")
 
 createHeaders :: Response -> [(FieldKey, FieldValue)]
 createHeaders response =
