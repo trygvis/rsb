@@ -1,9 +1,14 @@
+{-# LANGUAGE Arrows, NoMonomorphismRestriction #-}
 import Debug.Trace
 import Network.Rest.Cli.Rsb
-import Text.XML.HaXml.Parse hiding (content)
-import Text.XML.HaXml.Types
-import Text.XML.HaXml.Xtract.Parse
-import Text.XML.HaXml.Pretty
+-- Text.XML.HXT.Arrow.xread :: ArrowXml a => a String XmlTree
+import Text.XML.HXT.Arrow hiding (parseXmlDocument)
+-- Text.XML.HXT.Parser.XmlParsec.xread :: String -> XmlTrees
+--import Text.XML.HXT.Parser.XmlParsec(xread)
+--import Text.XML.HXT.Parser.XmlParsec(parseXmlDocument)
+--import Text.XML.HXT.DOM.XmlTreeFilter
+--import Text.XML.HXT.DOM.XmlTree(isXText)
+--import Text.XML.HXT.DOM.ShowXml
 
 -----------------
 
@@ -17,24 +22,28 @@ data AtomEntry = AtomEntry {
     , entryContent :: String
 }
 
--- type CFilter i = Content i -> [Content i]
--- xtract :: (String -> String) -> String -> CFilter i
--- content :: Content i -> Doc
+xmlToAtom :: ArrowXml a => a XmlTree AtomDocument
+xmlToAtom = atTag "root" >>> proc x -> do
+    title <- getFeedTitle -< x
+    returnA -< AtomDocument title []
 
-xmlToAtom :: Document a -> AtomDocument
-xmlToAtom (Document _ _ root _) = AtomDocument title entries
-    where
-        filter = xtract id "/title"
-        title = show (content (filter root))
-        entries = []
+--getFeed :: ArrowXml a => XmlTree AtomDocument
+--getFeed = atTag "feed" >>> listA getElem
+
+getFeedTitle :: ArrowXml a => a XmlTree String
+getFeedTitle = getChildren >>> hasName "title" >>> getText
+
+getEntries :: ArrowXml a => a XmlTree [AtomEntry]
+getEntries = error("getEntries")
+
+atTag :: ArrowXml a => String -> a XmlTree XmlTree
+atTag tag = deep $ isElem >>> hasName tag
 
 -----------------
 
 stringToAtom :: String -> AtomDocument
 stringToAtom text =
-    xmlToAtom document
-    where
-        document = xmlParse "http resource" text
+    head $ runLA (xread >>> xmlToAtom) text
 
 myApp2Function :: String -> Response String
 myApp2Function s = rsbReturn s

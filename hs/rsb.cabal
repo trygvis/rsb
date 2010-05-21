@@ -10,7 +10,7 @@ Cabal-Version:          >= 1.6
 Build-Type:             Simple
 
 Library
-  Build-Depends:        base >= 4 && < 5, parsec, webserver, c10k, bytestring, filepath, time, datetime, regex-posix, HTTP
+  Build-Depends:        base >= 4 && < 5, parsec, webserver, c10k, bytestring >= 0.9.1.4 && < 0.9.1.6, filepath, time, datetime, regex-posix, HTTP
   Exposed-Modules:      Network.Rest.Cli.Rsb,
                         Network.Rest.Rsb,
                         Network.Rest.WebServer,
@@ -29,5 +29,5 @@ Executable MyApp1
 
 Executable MyApp2
   Main-Is:              MyApp2.hs
-  Build-Depends:        HaXml
+  Build-Depends:        hxt, hxt-filter
   Other-Modules:        Network.Rest.Cli.Rsb
